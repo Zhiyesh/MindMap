@@ -1,7 +1,9 @@
 #include "mainwindow.h"
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent)
+    QMainWindow(parent),
+    labels(vector<MovableLabel*>()),
+    recent_changed_labels(list<vector<MovableLabel*>>(1, this->labels))
 {
     this->setFixedSize(1346, 867);
     this->setStyleSheet("font: 11.5pt \"黑体\";");
@@ -12,36 +14,61 @@ MainWindow::MainWindow(QWidget *parent) :
     MenuBar->setStyleSheet("background-color: rgb(0, 0, 0, 0);");
 
     this->File = new QMenu("文件", this);
+    this->Edit = new QMenu("编辑", this);
     this->Widget = new QMenu("界面", this);
     this->AddLabel = new QMenu("添加", this);
     this->Text = new QMenu("文字", this);
     MenuBar->addMenu(File);
+    MenuBar->addMenu(Edit);
     MenuBar->addMenu(Widget);
     MenuBar->addMenu(AddLabel);
     MenuBar->addMenu(Text);
 
     //文件栏
     this->NewLayout = new QAction("新建", File);
+    NewLayout->setShortcut(QKeySequence::New);
+
     this->OpenFile = new QAction("打开", File);
+    OpenFile->setShortcut(QKeySequence::Open);
+
     this->SaveFile = new QAction("保存", File);
+    SaveFile->setShortcut(QKeySequence::Save);
     SaveFile->setEnabled(false);
-    this->CloseFile = new QAction("关闭", File);
+
+    this->CloseFile = new QAction("关闭文件", File);
     CloseFile->setEnabled(false);
+
     connect(NewLayout, &QAction::triggered, this, &MainWindow::newLayout);
 
-    connect(OpenFile, &QAction::triggered, this, &MainWindow::openFile);
+    connect(OpenFile, &QAction::triggered, [this]() { this->openFile(); });
 
     connect(SaveFile, &QAction::triggered, this, &MainWindow::saveFile);
 
     connect(CloseFile, &QAction::triggered, this, &MainWindow::closeFile);
+
     File->addAction(NewLayout);
     File->addAction(OpenFile);
     File->addAction(SaveFile);
     File->addAction(CloseFile);
 
+    //编辑栏
+    this->Undo = new QAction("撤销", Edit);
+    Undo->setShortcut(QKeySequence::Undo);
+
+    this->Redo = new QAction("重做", Edit);
+    Redo->setShortcut(QKeySequence::Redo);
+
+    connect(Undo, &QAction::triggered, this, &MainWindow::undoLatest);
+
+    connect(Redo, &QAction::triggered, this, &MainWindow::cancelUndo);
+
+    Edit->addAction(Undo);
+    Edit->addAction(Redo);
+
     //界面栏
     this->ChangeWidget = new QAction("调整窗口大小", Widget);
     this->ClearAllLabel = new QAction("清空", Widget);
+
     connect(ChangeWidget, &QAction::triggered, [this]() {
         //Set cursor style
         this->setCursor(Qt::SizeVerCursor);
@@ -60,12 +87,14 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ClearAllLabel, &QAction::triggered, [this]() {
         this->removeLabel(Q_NULLPTR, Ml::AllLabels);
     });
+
     Widget->addAction(ChangeWidget);
     Widget->addAction(ClearAllLabel);
 
     //添加控件栏
     this->NewBracket = new QAction(QIcon(":/drawable/res/Bracket.png"), "括号", AddLabel);
     this->NewHLine = new QAction(QIcon(":/drawable/res/HLine.png"), "横线", AddLabel);
+
     connect(NewBracket, &QAction::triggered, [this]() {
         MovableLabel* currentML = this->newLabel(32, 183, Ml::Bracket, NULL);
         emit currentML->click();
@@ -75,11 +104,13 @@ MainWindow::MainWindow(QWidget *parent) :
         MovableLabel* currentML = this->newLabel(138, 26, Ml::HLine, NULL);
         emit currentML->click();
     });
+
     AddLabel->addAction(NewBracket);
     AddLabel->addAction(NewHLine);
 
     //文字栏
     this->AddText = new QAction("添加文字", Text);
+
     connect(AddText, &QAction::triggered, [this]() {
         if (!this->font_input->isHidden())
         {
@@ -109,10 +140,12 @@ MainWindow::MainWindow(QWidget *parent) :
         //Recover the cursor
         this->setCursor(Qt::ArrowCursor);
     });
+
     Text->addAction(AddText);
 
     this->labels_menu = new QMenu(this);
     QAction* const labels_menu_remove = new QAction("移除", this);
+
     connect(labels_menu_remove, &QAction::triggered, [this]() {
         if (this->chosedLabel != Q_NULLPTR)
         {
@@ -120,13 +153,16 @@ MainWindow::MainWindow(QWidget *parent) :
             this->chosedLabel = Q_NULLPTR;
         }
     });
+
     labels_menu->addAction(labels_menu_remove);
 
+    //文本输入框
     this->font_input = new QLineEdit(this);
     font_input->resize(FONT_LABEL_SIZE * 2, 40);
     font_input->setContextMenuPolicy(Qt::NoContextMenu);
     font_input->setStyleSheet(QString("font: %1pt \"黑体\"; background-color: rgb(0, 0, 0, 0); border: 1.5px dotted;").arg(FONT_LABEL_SIZE));
     font_input->hide();
+
     connect(font_input, &QLineEdit::textChanged, [this]() {
         //Adaptive width
         int __width = FONT_LABEL_SIZE * 2;
@@ -142,8 +178,10 @@ MainWindow::MainWindow(QWidget *parent) :
         }
         font_input->resize(__width, font_input->height());
     });
+
     connect(font_input, &QLineEdit::returnPressed, this, &MainWindow::buildFont);
 
+    //无文件提示
     this->NoFileIsOpen = new QLabel("无文件打开", this);
     NoFileIsOpen->setFixedSize(5 * 2 * 12, 50);
     NoFileIsOpen->move((this->width() >> 1) - NoFileIsOpen->width(), (this->height() >> 1) - NoFileIsOpen->height());
@@ -153,7 +191,18 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    delete labels_menu;
+}
+
+void MainWindow::closeEvent(QCloseEvent *e)
+{
+    if (this->SaveFile->isEnabled() && this->existedFileToSave())
+    {
+        e->ignore();
+        return;
+    }
+
+    this->clearChangedLabelsList();
+    e->accept();
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *e)
@@ -194,21 +243,22 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
     //未选中控件
     if (!this->hasLabelMoving)
     {
+        //组合键
         if (e->modifiers() == Qt::ControlModifier)
         {
-            if (e->key() == Qt::Key_R)
+            if (e->key() == Qt::Key_Z)
             {
-                //Ctrl + R
-                this->reloadFile();
+                this->undoLatest();
             }
+
             return;
         }
 
+        //按键快速添加控件
         if (this->AddLabel->isEnabled() && this->Text->isEnabled())
         {
             switch (e->key())
             {
-            //按键快速添加控件
             case Qt::Key_1:
                 emit this->NewBracket->triggered();
                 break;
@@ -314,10 +364,33 @@ void MainWindow::wheelEvent(QWheelEvent *e)
     }
 }
 
+void MainWindow::dragEnterEvent(QDragEnterEvent *e)
+{
+    if (e->mimeData()->hasUrls())
+    {
+        e->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *e)
+{
+    const QList<QUrl> urls = e->mimeData()->urls();
+    if (urls.isEmpty()) return;
+
+    //多个文件时，只读第一个文件
+    QString filePath = urls.first().toLocalFile();
+    if (!filePath.isEmpty())
+    {
+        this->openFile(filePath);
+    }
+}
+
 void MainWindow::changeWidget(const int &step)
 {
     const int targetHeight = this->height() + step;
-    if (targetHeight < 300 || targetHeight > QApplication::desktop()->screenGeometry().height()) return;
+    if (targetHeight < 300
+        || targetHeight > QApplication::desktop()->screenGeometry().height())
+            return;
     this->setFixedSize(this->width() + step, this->height() + step);
     this->move(this->x() - (step >> 1), this->y() - (step >> 1));
     this->MenuBar->setFixedSize(MenuBar->width() + step, MenuBar->height());
@@ -336,23 +409,35 @@ void MainWindow::removeLabel(MovableLabel *label, const Ml::LabelSelect &select)
 
     for (vector<MovableLabel*>::iterator it = this->labels.begin(); it != labels.end(); it++)
     {
-        MovableLabel* const currentML = *it;
-        if (currentML == label || flag)
+        MovableLabel* currentLabel = *it;
+
+        if (currentLabel == Q_NULLPTR) continue;
+
+        if (currentLabel == label || flag)
         {
-            currentML->hide();
-            delete currentML;
+            currentLabel->hide();
             this->labels.erase(it--);
+
             if (!flag) break;
         }
     }
+
+    this->recent_changed_labels.push_back(this->labels);
+    this->__currentOP = --this->recent_changed_labels.end();
+
     if (!(this->filePath.isEmpty() && this->labels.empty())) this->SaveFile->setEnabled(true);
     else this->SaveFile->setEnabled(false);
 }
 
-MovableLabel* MainWindow::newLabel(const int &w, const int &h, const Ml::LabelType &type, const QString &text)
+MovableLabel*
+MainWindow::newLabel(const int &w,
+                   const int &h,
+                   const Ml::LabelType &type,
+                   const QString &text,
+                   const QString &text_size)
 {
     this->isChangingWidget = false;
-    MovableLabel* const label = new MovableLabel(w, h, type, text, this);
+    MovableLabel* const label = new MovableLabel(w, h, type, text, text_size, this);
     label->show();
 
     //控件移动
@@ -402,9 +487,59 @@ MovableLabel* MainWindow::newLabel(const int &w, const int &h, const Ml::LabelTy
     });
 
     this->labels.push_back(label);
+
+    this->recent_changed_labels.push_back(this->labels);
+    this->__currentOP = --this->recent_changed_labels.end();
+
     this->SaveFile->setEnabled(true);
 
     return label;
+}
+
+void MainWindow::undoLatest()
+{
+    if (this->recent_changed_labels.empty()) return;
+
+    if (this->__currentOP != this->recent_changed_labels.begin())
+    {
+        for (auto it = this->labels.begin(); it != this->labels.end(); it++)
+        {
+            (*it)->hide();
+        }
+        this->labels.clear();
+
+        --this->__currentOP;
+
+        this->labels = *(this->__currentOP);
+
+        for (auto it = this->labels.begin(); it != this->labels.end(); it++)
+        {
+            (*it)->show();
+        }
+    }
+}
+
+void MainWindow::cancelUndo()
+{
+    if (this->recent_changed_labels.empty()) return;
+
+    if (this->__currentOP == this->recent_changed_labels.end()
+        || this->__currentOP == (--this->recent_changed_labels.end())) return;
+
+    for (auto it = this->labels.begin(); it != this->labels.end(); it++)
+    {
+        (*it)->hide();
+    }
+    this->labels.clear();
+
+    ++this->__currentOP;
+
+    this->labels = *(this->__currentOP);
+
+    for (auto it = this->labels.begin(); it != this->labels.end(); it++)
+    {
+        (*it)->show();
+    }
 }
 
 void MainWindow::buildFont()
@@ -416,9 +551,9 @@ void MainWindow::buildFont()
     if (!text.isEmpty())
     {
         //创建Label控件替换LineEdit控件
-        MovableLabel *label = this->newLabel(this->font_input->width() - FONT_LABEL_SIZE * 2, this->font_input->height(), Ml::FontType, text);
+        MovableLabel *label = this->newLabel(this->font_input->width() - FONT_LABEL_SIZE * 2,
+                                             this->font_input->height(), Ml::FontType, text);
         label->move(this->font_input->x(), this->font_input->y());
-        label->setStyleSheet(QString("font: %1pt \"黑体\";").arg(FONT_LABEL_SIZE));
     }
     this->font_input->setText("");
 }
@@ -426,12 +561,12 @@ void MainWindow::buildFont()
 bool MainWindow::existedFileToSave()
 {
     //提示是否要保存当前的labels
-    int result = QMessageBox::information(this, "保存文件", "当前文件未保存，是否先保存？", "保存", "放弃", "取消");
+    int result = QMessageBox::information(this, "保存文件", "当前文件还未保存", "保存", "放弃", "取消");
     if (result == 2) return true;  //取消
 
     if (result == 0)  //保存
     {
-        emit this->SaveFile->triggered();
+        if (!this->saveFile()) return true;
     }
     //放弃  不执行任何代码
 
@@ -443,6 +578,7 @@ bool MainWindow::newLayout()
     if (this->SaveFile->isEnabled() && this->existedFileToSave()) return false;
 
     this->removeLabel(Q_NULLPTR, Ml::AllLabels);
+    this->clearChangedLabelsList();
     this->SaveFile->setEnabled(false);
     this->CloseFile->setEnabled(false);
 
@@ -455,19 +591,20 @@ bool MainWindow::newLayout()
     return true;
 }
 
-void MainWindow::openFile()
+void MainWindow::openFile(QString filePath)
 {
     if (this->SaveFile->isEnabled() && this->existedFileToSave()) return;
 
-    QString filePath_Tmp = QFileDialog::getOpenFileName(this, "打开文件", QStandardPaths::writableLocation(QStandardPaths::DesktopLocation), "Json文件 (*.json)");
-    if (filePath_Tmp.isEmpty()) return;
-
-    this->filePath = filePath_Tmp;
-
-    if (!this->labels.empty())
+    if (filePath.isEmpty())
     {
-        this->removeLabel(Q_NULLPTR, Ml::AllLabels);
+        filePath = QFileDialog::getOpenFileName(this,
+                        "打开文件",
+                        QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
+                        "Json文件 (*.json)");
     }
+    if (filePath.isEmpty()) return;
+
+    this->filePath = filePath;
 
     //读文件
     QFile fileManager(this->filePath);
@@ -481,12 +618,22 @@ void MainWindow::openFile()
 
     QJsonDocument labelInfo = QJsonDocument::fromJson(fileData.toUtf8());
 
-    this->NoFileIsOpen->hide();
+    if (!labelInfo.isObject())
+    {
+        QMessageBox::warning(this, "错误", "文件无效！\n请检查后重试");
+        return;
+    }
 
-    if (!labelInfo.isObject()) return;
+    if (!this->labels.empty())
+    {
+        this->removeLabel(Q_NULLPTR, Ml::AllLabels);
+        this->clearChangedLabelsList();
+    }
 
     QJsonObject labelObj = labelInfo.object();
     jsonToLabel(labelObj);
+
+    this->NoFileIsOpen->hide();
 
     this->SaveFile->setEnabled(false);
     this->CloseFile->setEnabled(true);
@@ -535,21 +682,7 @@ void MainWindow::jsonToLabel(const QJsonObject &object)
     }
 }
 
-void MainWindow::reloadFile()
-{
-    if (this->filePath.isEmpty()) return;
-
-    if (!this->labels.empty())
-    {
-        this->removeLabel(Q_NULLPTR, Ml::AllLabels);
-        if (!this->filePath.isEmpty()) this->SaveFile->setEnabled(false);
-    }
-
-    //读文件
-    qDebug() << filePath;
-}
-
-void MainWindow::saveFile()
+bool MainWindow::saveFile()
 {
     if (this->filePath.isEmpty())
     {
@@ -559,7 +692,8 @@ void MainWindow::saveFile()
                             ? QStandardPaths::writableLocation(QStandardPaths::DesktopLocation) : this->filePath),
                     "Json文件 (*.json)"
                     );
-        if (this->filePath.isEmpty()) return;
+        if (this->filePath.isEmpty()) return false;
+        this->CloseFile->setEnabled(true);
     }
 
 //    this->filePath is not empty
@@ -592,13 +726,14 @@ void MainWindow::saveFile()
     if (fileManager.open(QFile::WriteOnly))
     {
         fileManager.write(fileData);
-        this->SaveFile->setEnabled(false);
         fileManager.close();
+        this->SaveFile->setEnabled(false);
+        return true;
     }
     else
     {
         QMessageBox::warning(this, "失败", "文件保存失败！");
-        return;
+        return false;
     }
 }
 
@@ -612,5 +747,35 @@ void MainWindow::closeFile()
     this->AddLabel->setEnabled(false);
     this->Text->setEnabled(false);
     this->NoFileIsOpen->show();
+}
+
+void MainWindow::clearChangedLabelsList()
+{
+    for (auto i = this->recent_changed_labels.begin();
+         i != this->recent_changed_labels.end(); i++)
+    {
+        for (auto it = i->begin(); it != i->end(); it++)
+        {
+            MovableLabel* label;
+            try
+            {
+                label = *it;
+                label->hide();
+            }
+            catch (std::exception e)
+            {
+                label = Q_NULLPTR;
+            }
+
+            if (label == Q_NULLPTR) continue;
+
+            label->deleteLater();
+            label = Q_NULLPTR;
+        }
+    }
+
+    this->recent_changed_labels.clear();
+    this->recent_changed_labels.push_back(vector<MovableLabel*>());
+    this->__currentOP = --this->recent_changed_labels.end();
 }
 

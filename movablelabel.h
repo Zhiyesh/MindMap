@@ -25,7 +25,7 @@ class MovableLabel : public QLabel
     Q_OBJECT
 
 public:
-    explicit MovableLabel(const int &w, const int &h, const Ml::LabelType &type, const QString &text = QString(), QWidget *parent = 0);
+    explicit MovableLabel(const int &w, const int &h, const Ml::LabelType &type, const QString &text = QString(), const QString &text_size = QString(), QWidget *parent = 0);
 
 public:
     Ml::LabelType type() const;
