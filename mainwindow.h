@@ -25,8 +25,6 @@
 
 #include "movablelabel.h"
 
-#include <QDebug>
-
 #define FONT_LABEL_SIZE  13
 
 using std::vector;
@@ -72,7 +70,8 @@ protected:
            const int &h,
            const Ml::LabelType &type,
            const QString &text = QString(),
-           const QString &text_size = QString());
+           const QString &text_size = QString(),
+           const bool &flag = false);
 
     void buildFont();
     bool existedFileToSave();
@@ -81,11 +80,11 @@ protected:
     void jsonToLabel(const QJsonObject &object);
     bool saveFile();
     void closeFile();
-    void clearChangedLabelsList();
+    void clearChangedLabelsList(const bool &flag = false);
 
 //Operation Undo and Redo
 protected:
-    void undoLatest();
+    void undoRecent();
     void cancelUndo();
 private:
     list<vector<MovableLabel*>>::iterator __currentOP;

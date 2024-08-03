@@ -58,7 +58,7 @@ MainWindow::MainWindow(QWidget *parent) :
     this->Redo = new QAction("重做", Edit);
     Redo->setShortcut(QKeySequence::Redo);
 
-    connect(Undo, &QAction::triggered, this, &MainWindow::undoLatest);
+    connect(Undo, &QAction::triggered, this, &MainWindow::undoRecent);
 
     connect(Redo, &QAction::triggered, this, &MainWindow::cancelUndo);
 
@@ -243,17 +243,6 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
     //未选中控件
     if (!this->hasLabelMoving)
     {
-        //组合键
-        if (e->modifiers() == Qt::ControlModifier)
-        {
-            if (e->key() == Qt::Key_Z)
-            {
-                this->undoLatest();
-            }
-
-            return;
-        }
-
         //按键快速添加控件
         if (this->AddLabel->isEnabled() && this->Text->isEnabled())
         {
@@ -434,7 +423,8 @@ MainWindow::newLabel(const int &w,
                    const int &h,
                    const Ml::LabelType &type,
                    const QString &text,
-                   const QString &text_size)
+                   const QString &text_size,
+                   const bool &flag)
 {
     this->isChangingWidget = false;
     MovableLabel* const label = new MovableLabel(w, h, type, text, text_size, this);
@@ -488,17 +478,21 @@ MainWindow::newLabel(const int &w,
 
     this->labels.push_back(label);
 
-    this->recent_changed_labels.push_back(this->labels);
-    this->__currentOP = --this->recent_changed_labels.end();
+    if (!flag)
+    {
+        this->recent_changed_labels.push_back(this->labels);
+        this->__currentOP = --this->recent_changed_labels.end();
+    }
 
     this->SaveFile->setEnabled(true);
 
     return label;
 }
 
-void MainWindow::undoLatest()
+void MainWindow::undoRecent()
 {
-    if (this->recent_changed_labels.empty()) return;
+    if (this->recent_changed_labels.empty()
+        || this->recent_changed_labels.size() <= 1) return;
 
     if (this->__currentOP != this->recent_changed_labels.begin())
     {
@@ -511,6 +505,7 @@ void MainWindow::undoLatest()
         --this->__currentOP;
 
         this->labels = *(this->__currentOP);
+        this->SaveFile->setEnabled(true);
 
         for (auto it = this->labels.begin(); it != this->labels.end(); it++)
         {
@@ -521,7 +516,8 @@ void MainWindow::undoLatest()
 
 void MainWindow::cancelUndo()
 {
-    if (this->recent_changed_labels.empty()) return;
+    if (this->recent_changed_labels.empty()
+        || this->recent_changed_labels.size() <= 1) return;
 
     if (this->__currentOP == this->recent_changed_labels.end()
         || this->__currentOP == (--this->recent_changed_labels.end())) return;
@@ -535,6 +531,7 @@ void MainWindow::cancelUndo()
     ++this->__currentOP;
 
     this->labels = *(this->__currentOP);
+    this->SaveFile->setEnabled(true);
 
     for (auto it = this->labels.begin(); it != this->labels.end(); it++)
     {
@@ -583,6 +580,7 @@ bool MainWindow::newLayout()
     this->CloseFile->setEnabled(false);
 
     this->filePath = QString();
+    this->Edit->setEnabled(true);
     this->Widget->setEnabled(true);
     this->AddLabel->setEnabled(true);
     this->Text->setEnabled(true);
@@ -627,16 +625,24 @@ void MainWindow::openFile(QString filePath)
     if (!this->labels.empty())
     {
         this->removeLabel(Q_NULLPTR, Ml::AllLabels);
-        this->clearChangedLabelsList();
+    }
+
+    if (!this->recent_changed_labels.empty())
+    {
+        this->clearChangedLabelsList(true);
     }
 
     QJsonObject labelObj = labelInfo.object();
     jsonToLabel(labelObj);
 
+    this->recent_changed_labels.push_back(this->labels);
+    this->__currentOP = --this->recent_changed_labels.end();
+
     this->NoFileIsOpen->hide();
 
     this->SaveFile->setEnabled(false);
     this->CloseFile->setEnabled(true);
+    this->Edit->setEnabled(true);
     this->Widget->setEnabled(true);
     this->AddLabel->setEnabled(true);
     this->Text->setEnabled(true);
@@ -677,7 +683,7 @@ void MainWindow::jsonToLabel(const QJsonObject &object)
 
     if (w * h != 0)
     {
-        MovableLabel* label = this->newLabel(w, h, Ml::LabelType(type), text);
+        MovableLabel* label = this->newLabel(w, h, Ml::LabelType(type), text, QString(), true);
         label->move(x, y);
     }
 }
@@ -699,7 +705,6 @@ bool MainWindow::saveFile()
 //    this->filePath is not empty
 
     //写文件
-    qDebug() << filePath;
     QJsonDocument __label_info;
 
     QJsonObject __flag;
@@ -743,30 +748,21 @@ void MainWindow::closeFile()
 
     if (!this->newLayout()) return;
 
+    this->Edit->setEnabled(false);
     this->Widget->setEnabled(false);
     this->AddLabel->setEnabled(false);
     this->Text->setEnabled(false);
     this->NoFileIsOpen->show();
 }
 
-void MainWindow::clearChangedLabelsList()
+void MainWindow::clearChangedLabelsList(const bool &flag)
 {
     for (auto i = this->recent_changed_labels.begin();
          i != this->recent_changed_labels.end(); i++)
     {
         for (auto it = i->begin(); it != i->end(); it++)
         {
-            MovableLabel* label;
-            try
-            {
-                label = *it;
-                label->hide();
-            }
-            catch (std::exception e)
-            {
-                label = Q_NULLPTR;
-            }
-
+            MovableLabel* label = *it;
             if (label == Q_NULLPTR) continue;
 
             label->deleteLater();
@@ -775,7 +771,12 @@ void MainWindow::clearChangedLabelsList()
     }
 
     this->recent_changed_labels.clear();
-    this->recent_changed_labels.push_back(vector<MovableLabel*>());
-    this->__currentOP = --this->recent_changed_labels.end();
+    this->__currentOP = this->recent_changed_labels.end();
+
+    if (!flag)
+    {
+        this->recent_changed_labels.push_back(vector<MovableLabel*>());
+        this->__currentOP = --this->recent_changed_labels.end();
+    }
 }
 
