@@ -2,32 +2,62 @@
 
 const QString LabelRes[] = {
     ":/drawable/res/Bracket.png",
-    ":/drawable/res/HLine.png"
+    ":/drawable/res/HLine.png",
+    ":/drawable/res/VLine.png"
 };
 
-MovableLabel::MovableLabel(const int &w, const int &h, const Ml::LabelType &type, const QString &text, const QString &text_size, QWidget *parent) : QLabel(parent)
+MovableLabel::MovableLabel(
+    const int &w,
+    const int &h,
+    const Ml::LabelType &type,
+    const QString &text,
+    const int &text_size,
+    QWidget *parent) : QLabel(parent)
 {
-    this->setFixedSize(w, h);
-    this->setText(text);
-    this->labelType = type;
+    setFixedSize(w, h);
+    setText(text);
+    labelType = type;
 
-    if (this->labelType) this->setStyleSheet(QString("image: url(%1);").arg(LabelRes[this->labelType - 1]));
+    if (labelType) setStyleSheet(QString("image: url(%1);").arg(LabelRes[labelType - 1]));
     else
     {
-        this->is_font = true;
-        if (!text_size.isEmpty()) this->setStyleSheet(QString("font: %1pt \"黑体\";").arg(text_size));
-        else this->setStyleSheet("font: 13pt \"黑体\";");
+        is_font = true;
+        setStyleSheet(
+            QString("font: %1pt \"黑体\";")
+                    .arg(QString::number(this->text_size = (text_size ? text_size : (13))))
+        );
     }
+
+    setStyleSheet(
+        QString(styleSheet()).append("background-color: rgb(0, 0, 0, 0);")
+    );
 }
 
 Ml::LabelType MovableLabel::type() const
 {
-    return this->labelType;
+    return labelType;
 }
 
 bool MovableLabel::isFont() const
 {
-    return this->is_font;
+    return is_font;
+}
+
+int MovableLabel::textSize() const
+{
+    return text_size;
+}
+
+void MovableLabel::setTextSize(const int &text_size)
+{
+    if (text_size < 4) return;
+
+    const QString __sep = ";";
+    QStringList style_sheet_list = styleSheet().split(__sep);
+    style_sheet_list[0] = QString("font: %1pt \"黑体\"")
+            .arg(QString::number(this->text_size = (text_size ? text_size : (13))));
+
+    setStyleSheet(QString(style_sheet_list.join(__sep)));
 }
 
 void MovableLabel::mousePressEvent(QMouseEvent* e)

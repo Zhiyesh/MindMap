@@ -25,10 +25,16 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    movablelabel.cpp
+    movablelabel.cpp \
+    resizewidgetdialog.cpp \
+    process.cpp \
+    painting.cpp
 
 HEADERS  += mainwindow.h \
-    movablelabel.h
+    movablelabel.h \
+    resizewidgetdialog.h \
+    process.h \
+    painting.h
 
 FORMS    +=
 

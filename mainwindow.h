@@ -2,46 +2,60 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+
+//菜单栏
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
 
+//滚动条
+#include <QScrollBar>
+
+//控件
+#include <QLineEdit>
+#include <QMessageBox>
+
+
+//鼠标
 #include <QMouseEvent>
 #include <QMimeData>
 
+//进程
 #include <QTime>
-#include <QApplication>
 #include <QCoreApplication>
+#include <QApplication>
+
+//文件
 #include <QDesktopWidget>
-#include <QLineEdit>
-#include <QMessageBox>
 #include <QStandardPaths>
 #include <QFileDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 
 #include <vector>
 #include <list>
 
+#include <QDebug>
+
+#include "process.h"
+#include "painting.h"
 #include "movablelabel.h"
+#include "resizewidgetdialog.h"
+
+#define FONT_HEIGHT  50
+
+#define BG_WIDGET_X  0
+#define BG_WIDGET_Y  FONT_HEIGHT
+#define BG_WIDGET_WIDTH   1246
+#define BG_WIDGET_HEIGHT  667
 
 #define FONT_LABEL_SIZE  13
+#define FONT_LABEL_SIZE_INCRE 5
 
 using std::vector;
 using std::list;
 
-class Process
-{
-public:
-    static void sleep(const int &ms)
-    {
-        QTime targetTime = QTime::currentTime().addMSecs(ms);
-        while (targetTime > QTime::currentTime())
-        {
-            QCoreApplication::processEvents(QEventLoop::AllEvents);
-        }
-    }
-};
 
 class MainWindow : public QMainWindow
 {
@@ -51,10 +65,15 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+signals:
+    void addOrRemoveLabel();
+    void undoOrRedoOper();
+
 protected:
     void closeEvent(QCloseEvent* e);
+    void resizeEvent(QResizeEvent*);
 
-    void mousePressEvent(QMouseEvent *e);
+    void mousePressEvent(QMouseEvent* e);
     void keyPressEvent(QKeyEvent* e);
     void wheelEvent(QWheelEvent* e);
 
@@ -70,12 +89,12 @@ protected:
            const int &h,
            const Ml::LabelType &type,
            const QString &text = QString(),
-           const QString &text_size = QString(),
+           const int &text_size = 0,
            const bool &flag = false);
 
     void buildFont();
     bool existedFileToSave();
-    bool newLayout();
+    bool newLayout(const bool &flag = false);
     void openFile(QString filePath = QString());
     void jsonToLabel(const QJsonObject &object);
     bool saveFile();
@@ -88,41 +107,67 @@ protected:
     void cancelUndo();
 private:
     list<vector<MovableLabel*>>::iterator __currentOP;
-//
 
 private:
-    QMenuBar* MenuBar;   //菜单栏
-    QMenu *File;         //文件
-    QMenu *Edit;         //编辑
-    QMenu *Widget;       //界面
-    QMenu *AddLabel;     //添加
-    QMenu *Text;         //文字
+    //菜单栏
+    QMenuBar* _M_MenuBar;
+    QMenu* _M_File;         //文件
+    QMenu* _M_Edit;         //编辑
+    QMenu* _M_AddLabel;     //添加
+    QMenu* _M_Text;         //文字
+    QMenu* _M_Widget;       //界面
 
-    QAction *NewLayout;      //新建
-    QAction *OpenFile;       //打开
-    QAction *SaveFile;       //保存
-    QAction *CloseFile;      //关闭
+    QAction* _M_NewLayout;      //新建
+    QAction* _M_OpenFile;       //打开
+    QAction* _M_SaveFile;       //保存
+    QAction* _M_CloseFile;      //关闭
 
-    QAction *Undo;           //撤销
-    QAction *Redo;           //重做
+    QAction* _M_Undo;           //撤销
+    QAction* _M_Redo;           //重做
+    QAction* _M_ClearAllLabel;  //清空
 
-    QAction *ChangeWidget;   //设置窗口大小
-    QAction *ClearAllLabel;  //清空窗口
+    QAction* _M_NewBracket;  //括号
+    QAction* _M_NewHLine;   //横线
+    QAction* _M_AddText;    //添加文字
 
-    QAction *NewBracket;  //括号
-    QAction *NewHLine;   //横线
-    QAction *AddText;    //添加文字
+    QAction* _M_ResizeWidget;   //设置画布大小
 
+    //横向滚动条
+    QScrollBar* _M_HSclBar;
+
+    //竖向滚动条
+    QScrollBar* _M_VSclBar;
+
+    //背景画布
+    Painting* bgnd_widget;
+
+    //画布遮罩
+    QLabel* shade_bgnd_widget;
+
+    //Label
     vector<MovableLabel*> labels;
     list<vector<MovableLabel*>> recent_changed_labels;
-    QMenu* labels_menu;
+
+    //控件菜单
+    QMenu* label_menu;
+
+    //菜单编辑项
+    QAction* label_menu_font_edit;
+
+    //菜单移除项
+    QAction* label_menu_remove;
+
+    //文字输入
     QLineEdit* font_input;
-    QLabel* NoFileIsOpen;
+
+    //无打开 提示
+    QLabel* _M_NoFileIsOpen;
+
+    //打开文件路径
     QString filePath;
 
 private:
-    bool isChangingWidget = false;
-    bool hasLabelMoving = false;
+    bool _M_HasLabelMoving = false;
     MovableLabel* chosedLabel;
     bool selectingFontPos = false;
     bool selectedFontPos = false;
