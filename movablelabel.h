@@ -25,20 +25,22 @@ class MovableLabel : public QLabel
     Q_OBJECT
 
 public:
-    explicit MovableLabel(
-        const int &w,
-        const int &h,
-        const Ml::LabelType &type,
+    explicit MovableLabel(const Ml::LabelType &type,
         const QString &text = QString(),
+        const int &w = 0,
+        const int &h = 0,
+        const int &rotate = 0,
         const int &text_size = 0,
         QWidget *parent = 0
     );
 
 public:
     Ml::LabelType type() const;
+    void rotateRight();
+    int rotateValue() const;
     bool isFont() const;
-    int textSize() const;
     void setTextSize(const int &text_size);
+    int textSize() const;
 
 protected:
     void mousePressEvent(QMouseEvent* e);
@@ -51,7 +53,10 @@ signals:
 
 private:
     Ml::LabelType labelType;
+    QImage ResImg;
+    int rotate_value = 0;
     bool is_font = false;
+    QSize scale_value;
     int text_size = 0;
 };
 

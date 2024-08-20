@@ -75,7 +75,9 @@ protected:
 
     void mousePressEvent(QMouseEvent* e);
     void keyPressEvent(QKeyEvent* e);
+    void keyReleaseEvent(QKeyEvent* e);
     void wheelEvent(QWheelEvent* e);
+    void focusOutEvent(QFocusEvent*);
 
     void dragEnterEvent(QDragEnterEvent* e);
     void dropEvent(QDropEvent* e);
@@ -85,10 +87,11 @@ protected:
     void removeLabel(MovableLabel *label, const Ml::LabelSelect &select = Ml::None);
 
     MovableLabel*
-    newLabel(const int &w,
-           const int &h,
-           const Ml::LabelType &type,
+    newLabel(const Ml::LabelType &type,
            const QString &text = QString(),
+           const int &w = 0,
+           const int &h = 0,
+           const int &rotate = 0,
            const int &text_size = 0,
            const bool &flag = false);
 
@@ -172,6 +175,7 @@ private:
     bool selectingFontPos = false;
     bool selectedFontPos = false;
     bool canceledSelectFontPos = false;
+    bool _M_is_copy_label = false;
 };
 
 #endif // MAINWINDOW_H

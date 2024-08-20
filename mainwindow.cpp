@@ -150,12 +150,12 @@ MainWindow::MainWindow(QWidget *parent) :
     _M_NewHLine = new QAction(QIcon(":/drawable/res/HLine.png"), "横线", _M_AddLabel);
 
     connect(_M_NewBracket, &QAction::triggered, [this]() {
-        MovableLabel* currentML = newLabel(32, 183, Ml::Bracket);
+        MovableLabel* currentML = newLabel(Ml::Bracket, QString(), 32, 183);
         emit currentML->click();
     });
 
     connect(_M_NewHLine, &QAction::triggered, [this]() {
-        MovableLabel* currentML = newLabel(138, 26, Ml::HLine);
+        MovableLabel* currentML = newLabel(Ml::HLine, QString(), 138, 26);
         emit currentML->click();
     });
 
@@ -234,7 +234,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     //界面栏
     _M_ResizeWidget = new QAction("设置画布大小\x20\x20", _M_Widget);
-    _M_ResizeWidget->setShortcut(QKeySequence("Ctrl+R"));
+    _M_ResizeWidget->setShortcut(QKeySequence("Ctrl+D"));
 
     connect(_M_ResizeWidget, &QAction::triggered, [this]() {
         if (bgnd_widget->isHidden()) return;
@@ -258,7 +258,11 @@ MainWindow::MainWindow(QWidget *parent) :
         while (!resize_widget_dialog.isHidden())
         {
             if (isMinimized() || isHidden()) break;
-            if (!resize_widget_dialog.focus()) break;
+            if (!resize_widget_dialog.focus())
+            {
+                resize_widget_dialog.close();
+                break;
+            }
 
             Process::continueSleep(5e1);
         }
@@ -434,6 +438,12 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
     //未选中控件
     if (!_M_HasLabelMoving)
     {
+        if (e->key() == Qt::Key_Control && this->hasFocus())
+        {
+            _M_is_copy_label = true;
+        }
+        else _M_is_copy_label = false;
+
         //按键快速添加控件
         if (_M_AddLabel->isEnabled() && _M_Text->isEnabled())
         {
@@ -488,16 +498,24 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
     }
 }
 
+void MainWindow::keyReleaseEvent(QKeyEvent *e)
+{
+    if (e->key() == Qt::Key_Control)
+    {
+        _M_is_copy_label = false;
+    }
+}
+
 void MainWindow::wheelEvent(QWheelEvent *e)
 {
     //控件大小变化步长
-    const int LABEL_STEP = 2;
+    const int LABEL_STEP = 1;
     //控件最大和最小大小
     const int LABEL_MAX = 343;
     const int LABEL_MIN = 17;
 
     //滚动条滑动步长
-    const int SLIDER_STEP = 10;
+    const int SLIDER_STEP = 50;
 
     //向上滚动
     if (e->angleDelta().y() > 0)
@@ -505,26 +523,26 @@ void MainWindow::wheelEvent(QWheelEvent *e)
         //控件缩小
         if (_M_HasLabelMoving)
         {
-            if (!chosedLabel->isFont()
-                && chosedLabel->width() > LABEL_MIN && chosedLabel->height() > LABEL_MIN)
+            if (!chosedLabel->isFont())
             {
-                double __ratio = (double)chosedLabel->width() / (double)chosedLabel->height();
-                if (__ratio > 1)
+                if (chosedLabel->width() > LABEL_MIN && chosedLabel->height() > LABEL_MIN)
                 {
-                    int __chheight = chosedLabel->height() - LABEL_STEP;
-                    chosedLabel->setFixedSize(__chheight * __ratio, __chheight);
-                }
-                else
-                {
-                    int __chwidth = chosedLabel->width() - LABEL_STEP;
-                    chosedLabel->setFixedSize(__chwidth, (int)__chwidth / __ratio);
+                    double __ratio = (double)chosedLabel->width() / (double)chosedLabel->height();
+                    if (__ratio > 1)
+                    {
+                        int __chheight = chosedLabel->height() - LABEL_STEP;
+                        chosedLabel->setFixedSize(__chheight * __ratio, __chheight);
+                    }
+                    else
+                    {
+                        int __chwidth = chosedLabel->width() - LABEL_STEP;
+                        chosedLabel->setFixedSize(__chwidth, (int)__chwidth / __ratio);
+                    }
                 }
             }
             else
             {
                 chosedLabel->setTextSize(chosedLabel->textSize() - 1);
-                chosedLabel->setFixedWidth(chosedLabel->text().size() * chosedLabel->textSize() * 2);
-                chosedLabel->setFixedHeight(chosedLabel->width() >> 1);
             }
 
             return;
@@ -554,26 +572,26 @@ void MainWindow::wheelEvent(QWheelEvent *e)
         //控件放大
         if (_M_HasLabelMoving)
         {
-            if (!chosedLabel->isFont()
-                && chosedLabel->width() < LABEL_MAX && chosedLabel->height() < LABEL_MAX)
+            if (!chosedLabel->isFont())
             {
-                double __ratio = (double)chosedLabel->width() / (double)chosedLabel->height();
-                if (__ratio > 1)
+                if (chosedLabel->width() < LABEL_MAX && chosedLabel->height() < LABEL_MAX)
                 {
-                    int __chheight = chosedLabel->height() + LABEL_STEP;
-                    chosedLabel->setFixedSize(__chheight * __ratio, __chheight);
-                }
-                else
-                {
-                    int __chwidth = chosedLabel->width() + LABEL_STEP;
-                    chosedLabel->setFixedSize(__chwidth, (int)__chwidth / __ratio);
+                    double __ratio = (double)chosedLabel->width() / (double)chosedLabel->height();
+                    if (__ratio > 1)
+                    {
+                        int __chheight = chosedLabel->height() + LABEL_STEP;
+                        chosedLabel->setFixedSize(__chheight * __ratio, __chheight);
+                    }
+                    else
+                    {
+                        int __chwidth = chosedLabel->width() + LABEL_STEP;
+                        chosedLabel->setFixedSize(__chwidth, (int)__chwidth / __ratio);
+                    }
                 }
             }
             else
             {
                 chosedLabel->setTextSize(chosedLabel->textSize() + 1);
-                chosedLabel->setFixedWidth(chosedLabel->text().size() * chosedLabel->textSize() * 2);
-                chosedLabel->setFixedHeight(chosedLabel->width() >> 1);
             }
 
             return;
@@ -615,6 +633,11 @@ void MainWindow::wheelEvent(QWheelEvent *e)
             _M_HSclBar->setValue(_M_HSclBar->value() - SLIDER_STEP);
         }
     }
+}
+
+void MainWindow::focusOutEvent(QFocusEvent *)
+{
+    _M_is_copy_label = false;
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *e)
@@ -687,20 +710,38 @@ void MainWindow::removeLabel(MovableLabel *label, const Ml::LabelSelect &select)
 }
 
 MovableLabel*
-MainWindow::newLabel(const int &w,
-                   const int &h,
-                   const Ml::LabelType &type,
+MainWindow::newLabel(const Ml::LabelType &type,
                    const QString &text,
+                   const int &w,
+                   const int &h,
+                   const int &rotate,
                    const int &text_size,
                    const bool &flag)
 {
-    MovableLabel* const label = new MovableLabel(w, h, type, text, text_size, bgnd_widget);
+    MovableLabel* const label = new MovableLabel(type, text, w, h, rotate, text_size, bgnd_widget);
     label->show();
 
     //控件移动
     connect(label, &MovableLabel::click, [=]() {
         if (selectingFontPos) return;
         if (!label_menu->isHidden()) return;
+
+        if (!_M_HasLabelMoving && _M_is_copy_label)
+        {
+            MovableLabel* __label = newLabel(
+                label->type(),
+                label->text(),
+                label->width(),
+                label->height(),
+                label->rotateValue(),
+                label->textSize()
+            );
+
+            _M_is_copy_label = false;
+            __label->click();
+
+            return;
+        }
 
         _M_HasLabelMoving = !_M_HasLabelMoving;
         if (_M_HasLabelMoving)
@@ -734,9 +775,23 @@ MainWindow::newLabel(const int &w,
     connect(label, &MovableLabel::clickRight, [=]() {
         if (_M_HasLabelMoving)
         {
-            emit label->click();
+            if (label->isFont())
+            {
+                emit label->click();
+
+                chosedLabel = label;
+                emit label_menu_font_edit->triggered();
+                chosedLabel = Q_NULLPTR;
+            }
+            else
+            {
+                //控件旋转
+                label->rotateRight();
+            }
+
             return;
         }
+
         chosedLabel = label;
 
         if (label->isFont())
@@ -854,8 +909,7 @@ void MainWindow::buildFont()
     if (!text.isEmpty())
     {
         //创建Label控件替换LineEdit控件
-        MovableLabel *label = newLabel(font_input->width() - FONT_LABEL_SIZE * 2,
-                                             font_input->height(), Ml::FontType, text);
+        MovableLabel *label = newLabel(Ml::FontType, text);
         label->move(bgnd_widget->mapFromParent(
             QPoint(font_input->x(), font_input->y())
         ));
@@ -924,17 +978,17 @@ void MainWindow::openFile(QString filePath)
 
     if (filePath.isEmpty())
     {
-        filePath = QFileDialog::getOpenFileName(this,
+        this->filePath = QFileDialog::getOpenFileName(this,
                         "打开文件",
                         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
                         "Json文件 (*.json)");
     }
-    if (filePath.isEmpty()) return;
+    else this->filePath = filePath;
 
-    filePath = filePath;
+    if (this->filePath.isEmpty()) return;
 
     //读文件
-    QFile fileManager(filePath);
+    QFile fileManager(this->filePath);
     if (!fileManager.open(QFile::ReadOnly))
     {
         QMessageBox::warning(this, "失败", "打开失败！\n请检查文件是否正确\t");
@@ -983,7 +1037,7 @@ void MainWindow::openFile(QString filePath)
 
 void MainWindow::jsonToLabel(const QJsonObject &object)
 {
-    int x = 0, y = 0, w = 0, h = 0, type = 0;
+    int x = 0, y = 0, w = 0, h = 0, type = 0, rotate = 0;
     QString text = QString();
 
     QStringList __keys = object.keys();
@@ -1009,6 +1063,7 @@ void MainWindow::jsonToLabel(const QJsonObject &object)
             if (key == "width") w = value.toDouble();
             if (key == "height") h = value.toDouble();
             if (key == "type") type = value.toDouble();
+            if (key == "rotate") rotate = value.toDouble();
         }
 
         if (value.isString())
@@ -1022,7 +1077,7 @@ void MainWindow::jsonToLabel(const QJsonObject &object)
 
     if (w * h != 0)
     {
-        MovableLabel* label = newLabel(w, h, Ml::LabelType(type), text, 0, true);
+        MovableLabel* label = newLabel(Ml::LabelType(type), text, w, h, rotate, 0, true);
         label->move(x, y);
     }
 }
@@ -1061,6 +1116,7 @@ bool MainWindow::saveFile()
         currentObj.insert("width", QJsonValue(currentLabel->width()));
         currentObj.insert("height", QJsonValue(currentLabel->height()));
         currentObj.insert("type", QJsonValue(currentLabel->type()));
+        currentObj.insert("rotate", QJsonValue(currentLabel->rotateValue()));
         currentObj.insert("text", QJsonValue(currentLabel->text()));
         __label_obj.insert(QString::number(i + 1), QJsonValue(currentObj));
     }
