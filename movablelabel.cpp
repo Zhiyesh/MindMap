@@ -1,11 +1,5 @@
 #include "movablelabel.h"
 
-const QString LabelRes[] = {
-    ":/drawable/res/Bracket.png",
-    ":/drawable/res/HLine.png",
-    ":/drawable/res/VLine.png"
-};
-
 MovableLabel::MovableLabel(const Ml::LabelType &type,
     const QString &text,
     const int &w,
@@ -36,9 +30,11 @@ MovableLabel::MovableLabel(const Ml::LabelType &type,
         setText(text);
         setStyleSheet(
             QString("font: %1pt \"黑体\";")
-                    .arg(QString::number(this->text_size = (text_size ? text_size : (13))))
+                    .arg(QString::number(
+                        this->text_size = (text_size ? text_size : (FONT_LABEL_SIZE))
+                    ))
         );
-        setFixedSize(this->sizeHint());
+        setFixedSize(this->sizeHint().width(), FONT_HEIGHT);
     }
 
     setStyleSheet(
@@ -87,7 +83,7 @@ void MovableLabel::setTextSize(const int &text_size)
     const QString __sep = ";";
     QStringList style_sheet_list = styleSheet().split(__sep);
     style_sheet_list[0] = QString("font: %1pt \"黑体\"")
-            .arg(QString::number(this->text_size = (text_size ? text_size : (13))));
+            .arg(QString::number(this->text_size = (text_size ? text_size : (FONT_LABEL_SIZE))));
 
     setStyleSheet(QString(style_sheet_list.join(__sep)));
 

@@ -145,9 +145,9 @@ MainWindow::MainWindow(QWidget *parent) :
     _M_Edit->addAction(_M_ClearAllLabel);
 
     //添加控件栏
-    _M_NewBracket = new QAction(QIcon(":/drawable/res/Bracket.png"), "括号", _M_AddLabel);
+    _M_NewBracket = new QAction(QIcon(LabelRes[Ml::Bracket - 1]), "括号", _M_AddLabel);
 
-    _M_NewHLine = new QAction(QIcon(":/drawable/res/HLine.png"), "横线", _M_AddLabel);
+    _M_NewHLine = new QAction(QIcon(LabelRes[Ml::Line - 1]), "横线", _M_AddLabel);
 
     connect(_M_NewBracket, &QAction::triggered, [this]() {
         MovableLabel* currentML = newLabel(Ml::Bracket, QString(), 32, 183);
@@ -155,7 +155,7 @@ MainWindow::MainWindow(QWidget *parent) :
     });
 
     connect(_M_NewHLine, &QAction::triggered, [this]() {
-        MovableLabel* currentML = newLabel(Ml::HLine, QString(), 138, 26);
+        MovableLabel* currentML = newLabel(Ml::Line, QString(), 138, 26);
         emit currentML->click();
     });
 
@@ -166,9 +166,9 @@ MainWindow::MainWindow(QWidget *parent) :
     _M_AddText = new QAction("添加文字", _M_Text);
 
     connect(_M_AddText, &QAction::triggered, [this]() {
-        if (!font_input->isHidden())
+        if (!font_edit->isHidden())
         {
-            font_input->setFocus();
+            font_edit->setFocus();
         }
         //Set cursor style
         setCursor(Qt::IBeamCursor);
@@ -187,9 +187,9 @@ MainWindow::MainWindow(QWidget *parent) :
             Process::continueSleep(1e2);
         }
         QPoint mouse = mapFromGlobal(cursor().pos());
-        font_input->move(mouse.x(), mouse.y() - (font_input->height() >> 1));
-        font_input->show();
-        font_input->setFocus();
+        font_edit->move(mouse.x(), mouse.y() - (font_edit->height() >> 1));
+        font_edit->show();
+        font_edit->setFocus();
         selectedFontPos = false;
         //Recover the cursor
         setCursor(Qt::ArrowCursor);
@@ -197,8 +197,38 @@ MainWindow::MainWindow(QWidget *parent) :
 
     _M_Text->addAction(_M_AddText);
 
-    label_menu = new QMenu(this);
+    label_menu = new MovableLabelMenu(this);
     label_menu->setStyleSheet(__Menu_Item_Style);
+
+    connect(label_menu, &QMenu::aboutToHide, [this]() {
+        shade_bgnd_widget->hide();
+    });
+
+    connect(label_menu, &MovableLabelMenu::positionPressed, [this](const int &key) {
+        if (chosedLabel != Q_NULLPTR && !label_menu->isHidden())
+        {
+            switch (key)
+            {
+            case MlMenu::Left:
+                chosedLabel->move(chosedLabel->x() - 1, chosedLabel->y());
+                break;
+            case MlMenu::Right:
+                chosedLabel->move(chosedLabel->x() + 1, chosedLabel->y());
+                break;
+            case MlMenu::Up:
+                chosedLabel->move(chosedLabel->x(), chosedLabel->y() - 1);
+                break;
+            case MlMenu::Down:
+                chosedLabel->move(chosedLabel->x(), chosedLabel->y() + 1);
+                break;
+            }
+
+            label_menu->move(bgnd_widget->mapToGlobal(
+                QPoint(chosedLabel->x() + (chosedLabel->width() >> 1) - (FONT_HEIGHT >> 1),
+                       chosedLabel->y() + (chosedLabel->height() >> 1) + (FONT_HEIGHT >> 1))
+            ));
+        }
+    });
 
     //菜单移除项
     label_menu_remove = new QAction("移除", this);
@@ -209,8 +239,6 @@ MainWindow::MainWindow(QWidget *parent) :
             removeLabel(chosedLabel);
             chosedLabel = Q_NULLPTR;
         }
-
-        shade_bgnd_widget->hide();
     });
 
     label_menu->addAction(label_menu_remove);
@@ -219,17 +247,16 @@ MainWindow::MainWindow(QWidget *parent) :
     label_menu_font_edit = new QAction("编辑", this);
 
     connect(label_menu_font_edit, &QAction::triggered, [this]() {
-        if (!chosedLabel->isFont()) return;
+        if (chosedLabel == Q_NULLPTR || !chosedLabel->isFont()) return;
 
-        font_input->show();
-        font_input->setFocus();
-        font_input->setText(chosedLabel->text());
-        font_input->move(bgnd_widget->mapToParent(
+        font_edit->show();
+        font_edit->setFocus();
+        font_edit->setText(chosedLabel->text());
+        font_edit->move(bgnd_widget->mapToParent(
             QPoint(chosedLabel->x(), chosedLabel->y()))
         );
         removeLabel(chosedLabel);
-
-        shade_bgnd_widget->hide();
+        chosedLabel = Q_NULLPTR;
     });
 
     //界面栏
@@ -273,29 +300,32 @@ MainWindow::MainWindow(QWidget *parent) :
     _M_Widget->addAction(_M_ResizeWidget);
 
     //文本输入框
-    font_input = new QLineEdit(this);
-    font_input->resize(FONT_LABEL_SIZE * 2, FONT_HEIGHT);
-    font_input->setContextMenuPolicy(Qt::NoContextMenu);
-    font_input->setStyleSheet(QString("font: %1pt \"黑体\"; background-color: rgb(0, 0, 0, 0); border: 1.5px dotted;").arg(FONT_LABEL_SIZE));
-    font_input->hide();
+    font_edit = new QLineEdit(this);
+    font_edit->resize(font_edit->fontMetrics().width("\x20") * 3, FONT_HEIGHT);
+    font_edit->setContextMenuPolicy(Qt::NoContextMenu);
+    font_edit->setStyleSheet(
+        QString("font: %1pt \"黑体\"; background-color: rgb(0, 0, 0, 0); border: 1.5px dotted;")
+                .arg(FONT_LABEL_SIZE)
+    );
+    font_edit->hide();
 
-    connect(font_input, &QLineEdit::textChanged, [this]() {
+    connect(font_edit, &QLineEdit::textChanged, [this]() {
         //Adaptive width
-        int __width = FONT_LABEL_SIZE * 2;
-        for (int i = 0; i < font_input->text().size(); i++)
+        const int __step = font_edit->fontMetrics().width("\x20\x20");
+        int __width = __step;
+        for (int i = 0; i < font_edit->text().size(); i++)
         {
-            const QChar each = font_input->text().at(i);
-            if (each.isNumber() || each.isSpace()
-                    || (each > 'A' && each < 'Z') || (each > 'a' && each < 'z'))
+            const ushort __code = font_edit->text().at(i).unicode();
+            if (__code >= 0x0020 && __code <= 0x007E)
             {
-                __width += FONT_LABEL_SIZE + FONT_LABEL_SIZE_INCRE;
+                __width += (__step >> 1);
             }
-            else __width += (FONT_LABEL_SIZE + FONT_LABEL_SIZE_INCRE) * 2;
+            else __width += __step;
         }
-        font_input->resize(__width, font_input->height());
+        font_edit->resize(__width, font_edit->height());
     });
 
-    connect(font_input, &QLineEdit::returnPressed, this, &MainWindow::buildFont);
+    connect(font_edit, &QLineEdit::returnPressed, this, &MainWindow::buildFont);
 
     //初始化画布
     bgnd_widget = new Painting(this);
@@ -406,9 +436,6 @@ void MainWindow::resizeEvent(QResizeEvent *)
 
 void MainWindow::mousePressEvent(QMouseEvent *e)
 {
-    //遮罩隐藏
-    shade_bgnd_widget->hide();
-
     if (e->button() == Qt::LeftButton)
     {
         //左键确定字体控件位置
@@ -455,7 +482,7 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
             case Qt::Key_2:
                 emit _M_NewHLine->triggered();
                 break;
-            case Qt::Key_F:
+            case ADD_TEXT_KEY:
                 emit _M_AddText->triggered();
                 break;
             }
@@ -481,6 +508,10 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
                 removeLabel(chosedLabel);
             }
             break;
+        //隐藏鼠标
+        case HIDE_MOUSE_KEY:
+            setCursor(Qt::BlankCursor);
+            break;
         //方向键移动控件
         case Qt::Key_Left:
             QCursor::setPos(QCursor::pos().x() - 1, QCursor::pos().y());
@@ -503,6 +534,12 @@ void MainWindow::keyReleaseEvent(QKeyEvent *e)
     if (e->key() == Qt::Key_Control)
     {
         _M_is_copy_label = false;
+    }
+
+    if (e->key() == HIDE_MOUSE_KEY)
+    {
+        if (_M_HasLabelMoving) setCursor(Qt::SizeAllCursor);
+        else setCursor(Qt::ArrowCursor);
     }
 }
 
@@ -680,9 +717,9 @@ void MainWindow::removeLabel(MovableLabel *label, const Ml::LabelSelect &select)
     if (select == Ml::AllLabels)
     {
         flag = true;
-        font_input->hide();
+        font_edit->hide();
         setFocus();
-        font_input->setText("");
+        font_edit->setText("");
     }
 
     for (vector<MovableLabel*>::iterator it = labels.begin(); it != labels.end(); it++)
@@ -822,10 +859,10 @@ MainWindow::newLabel(const Ml::LabelType &type,
 //        emit label->click();
 //        if (!label->isFont()) return;
 
-//        font_input->show();
-//        font_input->setFocus();
-//        font_input->setText(label->text());
-//        font_input->move(bgnd_widget->mapToParent(QPoint(label->x(), label->y())));
+//        font_edit->show();
+//        font_edit->setFocus();
+//        font_edit->setText(label->text());
+//        font_edit->move(bgnd_widget->mapToParent(QPoint(label->x(), label->y())));
 //        removeLabel(label);
 //    });
 
@@ -902,19 +939,19 @@ void MainWindow::cancelUndo()
 void MainWindow::buildFont()
 {
     selectedFontPos = false;
-    font_input->hide();
+    font_edit->hide();
     setFocus();
 
-    QString text = font_input->text();
+    QString text = font_edit->text();
     if (!text.isEmpty())
     {
         //创建Label控件替换LineEdit控件
         MovableLabel *label = newLabel(Ml::FontType, text);
         label->move(bgnd_widget->mapFromParent(
-            QPoint(font_input->x(), font_input->y())
+            QPoint(font_edit->x(), font_edit->y())
         ));
     }
-    font_input->setText("");
+    font_edit->setText("");
 }
 
 bool MainWindow::existedFileToSave()

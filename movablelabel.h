@@ -4,13 +4,15 @@
 #include <QLabel>
 #include <QMouseEvent>
 
+#define FONT_HEIGHT  50
+#define FONT_LABEL_SIZE  13
 
 namespace Ml {
     enum LabelType
     {
         FontType = 0,
         Bracket,  //括号
-        HLine    //横线
+        Line    //横线
     };
 
     enum LabelSelect
@@ -19,6 +21,11 @@ namespace Ml {
         AllLabels
     };
 }
+
+const QString LabelRes[] = {
+    ":/drawable/res/Bracket.png",
+    ":/drawable/res/Line.png",
+};
 
 class MovableLabel : public QLabel
 {

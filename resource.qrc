@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="/drawable">
         <file>res/Bracket.png</file>
-        <file>res/HLine.png</file>
+        <file>res/Line.png</file>
     </qresource>
 </RCC>

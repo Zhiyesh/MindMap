@@ -28,13 +28,15 @@ SOURCES += main.cpp\
     movablelabel.cpp \
     resizewidgetdialog.cpp \
     process.cpp \
-    painting.cpp
+    painting.cpp \
+    movablelabelmenu.cpp
 
 HEADERS  += mainwindow.h \
     movablelabel.h \
     resizewidgetdialog.h \
     process.h \
-    painting.h
+    painting.h \
+    movablelabelmenu.h
 
 FORMS    +=
 

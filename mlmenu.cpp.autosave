@@ -1,0 +1,26 @@
+#include "mlmenu.h"
+
+MlMenu::MlMenu(QWidget *parent) : QMenu(parent)
+{
+
+}
+
+void MlMenu::keyPressEvent(QKeyEvent *e)
+{
+    switch (e->key())
+    {
+    case Qt::Key_Left:
+        chosedLabel->move(chosedLabel->x() - 1, chosedLabel->y());
+        break;
+    case Qt::Key_Right:
+        chosedLabel->move(chosedLabel->x() + 1, chosedLabel->y());
+        break;
+    case Qt::Key_Up:
+        chosedLabel->move(chosedLabel->x(), chosedLabel->y() - 1);
+        break;
+    case Qt::Key_Down:
+        chosedLabel->move(chosedLabel->x(), chosedLabel->y() + 1);
+        break;
+    }
+}
+

@@ -41,17 +41,17 @@
 #include "process.h"
 #include "painting.h"
 #include "movablelabel.h"
+#include "movablelabelmenu.h"
 #include "resizewidgetdialog.h"
-
-#define FONT_HEIGHT  50
 
 #define BG_WIDGET_X  0
 #define BG_WIDGET_Y  FONT_HEIGHT
 #define BG_WIDGET_WIDTH   1246
 #define BG_WIDGET_HEIGHT  667
 
-#define FONT_LABEL_SIZE  13
-#define FONT_LABEL_SIZE_INCRE 5
+#define HIDE_MOUSE_KEY  Qt::Key_H
+#define ADD_TEXT_KEY    Qt::Key_F
+
 
 using std::vector;
 using std::list;
@@ -152,7 +152,7 @@ private:
     list<vector<MovableLabel*>> recent_changed_labels;
 
     //控件菜单
-    QMenu* label_menu;
+    MovableLabelMenu* label_menu;
 
     //菜单编辑项
     QAction* label_menu_font_edit;
@@ -161,7 +161,7 @@ private:
     QAction* label_menu_remove;
 
     //文字输入
-    QLineEdit* font_input;
+    QLineEdit* font_edit;
 
     //无打开 提示
     QLabel* _M_NoFileIsOpen;
